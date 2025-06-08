@@ -1,0 +1,84 @@
+#!/bin/bash
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+function execute_commit() {
+    local temp_file=$(mktemp)
+    local exit_code
+
+    git commit "$@" > "$temp_file" 2>&1
+    exit_code=$?
+
+    while IFS= read -r line; do
+        if [[ $line =~ ^\[.*\] ]]; then
+            # Commit summary line like "[main abc123] commit message"
+            echo -e "${GREEN}🎉 ${line}${NC}"
+        elif [[ $line == *" file"*"changed"* ]]; then
+            # Files changed summary like "1 file changed, 5 insertions(+)"
+            echo -e "${BLUE}📊 ${line}${NC}"
+        elif [[ $line == *"insertion"* ]]; then
+            echo -e "${GREEN}➕ ${line}${NC}"
+        elif [[ $line == *"deletion"* ]]; then
+            echo -e "${RED}➖ ${line}${NC}"
+        elif [[ $line == *"create mode"* ]]; then
+            echo -e "${GREEN}✨ ${line}${NC}"
+        elif [[ $line == *"delete mode"* ]]; then
+            echo -e "${RED}🗑️  ${line}${NC}"
+        elif [[ $line == *"rename"* ]]; then
+            echo -e "${PURPLE}🔄 ${line}${NC}"
+        elif [[ $line == *"copy"* ]]; then
+            echo -e "${CYAN}📋 ${line}${NC}"
+        elif [[ $line == *"nothing to commit"* ]]; then
+            echo -e "${YELLOW}🤷 ${line}${NC}"
+        elif [[ $line == *"working tree clean"* ]]; then
+            echo -e "${GREEN}✨ ${line}${NC}"
+        elif [[ $line == *"Changes not staged"* ]]; then
+            echo -e "${YELLOW}⚠️  ${line}${NC}"
+        elif [[ $line == *"Changes to be committed"* ]]; then
+            echo -e "${GREEN}📦 ${line}${NC}"
+        elif [[ $line == *"Untracked files"* ]]; then
+            echo -e "${DIM}🙈 ${line}${NC}"
+        elif [[ $line == *"use \"git add\""* ]]; then
+            echo -e "${DIM}💡 ${line}${NC}"
+        elif [[ $line == *"use \"git commit -a\""* ]]; then
+            echo -e "${DIM}💡 ${line}${NC}"
+        elif [[ $line == *"error:"* ]] || [[ $line == *"fatal:"* ]]; then
+            echo -e "${RED}❌ ${line}${NC}"
+        elif [[ $line == *"warning:"* ]]; then
+            echo -e "${YELLOW}⚠️  ${line}${NC}"
+        elif [[ $line == *"hint:"* ]]; then
+            echo -e "${DIM}💡 ${line}${NC}"
+        elif [[ $line == *"Author identity unknown"* ]]; then
+            echo -e "${YELLOW}👤 ${line}${NC}"
+        elif [[ $line =~ ^[[:space:]]*$ ]]; then
+            # Empty lines
+            echo "$line"
+        else
+            # Other output (like commit editor messages)
+            echo "$line"
+        fi
+    done < "$temp_file"
+
+    rm -f "$temp_file"
+    return $exit_code
+}
+
+function main() {
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        echo -e "${RED}fatal: not a git repository (or any of the parent directories): .git${NC}"
+        exit 128
+    fi
+
+    execute_commit "$@"
+}
+
+main "$@"
