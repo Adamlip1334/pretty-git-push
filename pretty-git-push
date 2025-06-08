@@ -1,0 +1,80 @@
+#!/bin/bash
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+function execute_push() {
+    local temp_file=$(mktemp)
+    local exit_code
+
+    git push "$@" > "$temp_file" 2>&1
+    exit_code=$?
+
+    while IFS= read -r line; do
+        if [[ $line == "To "* ]]; then
+            echo -e "${CYAN}🌐 ${line}${NC}"
+        elif [[ $line == "Enumerating objects:"* ]]; then
+            echo -e "${DIM}📦 ${line}${NC}"
+        elif [[ $line == "Counting objects:"* ]]; then
+            echo -e "${DIM}🔢 ${line}${NC}"
+        elif [[ $line == "Delta compression"* ]]; then
+            echo -e "${DIM}🗜️  ${line}${NC}"
+        elif [[ $line == "Compressing objects:"* ]]; then
+            echo -e "${DIM}🗜️  ${line}${NC}"
+        elif [[ $line == "Writing objects:"* ]]; then
+            echo -e "${BLUE}✍️  ${line}${NC}"
+        elif [[ $line == "Total "* ]]; then
+            echo -e "${BLUE}📊 ${line}${NC}"
+        elif [[ $line == "remote: "* ]]; then
+            # Remove "remote: " prefix and add emoji
+            local remote_msg=$(echo "$line" | sed 's/^remote: //')
+            echo -e "${PURPLE}🌍 remote: ${remote_msg}${NC}"
+        elif [[ $line == *"Everything up-to-date"* ]]; then
+            echo -e "${GREEN}✅ ${line}${NC}"
+        elif [[ $line == *"Branch"*"set up to track"* ]]; then
+            echo -e "${GREEN}🔗 ${line}${NC}"
+        elif [[ $line == *"fast-forward"* ]]; then
+            echo -e "${GREEN}⚡ ${line}${NC}"
+        elif [[ $line == *"new branch"* ]]; then
+            echo -e "${GREEN}🌱 ${line}${NC}"
+        elif [[ $line == *"error:"* ]] || [[ $line == *"fatal:"* ]]; then
+            echo -e "${RED}❌ ${line}${NC}"
+        elif [[ $line == *"warning:"* ]]; then
+            echo -e "${YELLOW}⚠️  ${line}${NC}"
+        elif [[ $line == *"hint:"* ]]; then
+            echo -e "${DIM}💡 ${line}${NC}"
+        elif [[ $line =~ ^[[:space:]]*[a-f0-9]+\.\.[a-f0-9]+[[:space:]] ]]; then
+            # Commit range lines like "abc123..def456  main -> main"
+            echo -e "${GREEN}🚀 ${line}${NC}"
+        elif [[ $line =~ ^\* ]]; then
+            # Lines starting with * (like "* [new branch]")
+            echo -e "${GREEN}⭐ ${line}${NC}"
+        else
+            echo "$line"
+        fi
+    done < "$temp_file"
+
+    # Clean up
+    rm -f "$temp_file"
+
+    return $exit_code
+}
+
+function main() {
+    # Check if we're in a git repository (silent check like git push does)
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        echo -e "${RED}fatal: not a git repository (or any of the parent directories): .git${NC}"
+        exit 128
+    fi
+    execute_push "$@"
+}
+
+main "$@"
