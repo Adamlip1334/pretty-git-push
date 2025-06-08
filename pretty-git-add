@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+function execute_add() {
+    local temp_file=$(mktemp)
+    local exit_code
+
+    git add "$@" > "$temp_file" 2>&1
+    exit_code=$?
+
+    # Process and colorize the output line by line
+    while IFS= read -r line; do
+        if [[ $line == *"added"* ]]; then
+            echo -e "${GREEN}✅ ${line}${NC}"
+        elif [[ $line == *"removed"* ]]; then
+            echo -e "${RED}🗑️  ${line}${NC}"
+        elif [[ $line == *"modified"* ]]; then
+            echo -e "${BLUE}📝 ${line}${NC}"
+        elif [[ $line == *"renamed"* ]]; then
+            echo -e "${PURPLE}🔄 ${line}${NC}"
+        elif [[ $line == *"copied"* ]]; then
+            echo -e "${CYAN}📋 ${line}${NC}"
+        elif [[ $line == *"warning:"* ]]; then
+            echo -e "${YELLOW}⚠️  ${line}${NC}"
+        elif [[ $line == *"error:"* ]] || [[ $line == *"fatal:"* ]]; then
+            echo -e "${RED}❌ ${line}${NC}"
+        elif [[ $line == *"hint:"* ]]; then
+            echo -e "${DIM}💡 ${line}${NC}"
+        elif [[ $line == *"The following paths are ignored"* ]]; then
+            echo -e "${DIM}🙈 ${line}${NC}"
+        elif [[ $line == *"Use -f if you really want to add them"* ]]; then
+            echo -e "${DIM}💪 ${line}${NC}"
+        elif [[ $line == *"nothing specified, nothing added"* ]]; then
+            echo -e "${YELLOW}🤷 ${line}${NC}"
+        elif [[ $line == *"Maybe you wanted 'git add .'?"* ]]; then
+            echo -e "${DIM}💡 ${line}${NC}"
+        else
+            # For silent git add operations, show a success message
+            if [[ -z "$line" && $exit_code -eq 0 ]]; then
+                echo -e "${GREEN}📦 Files staged successfully${NC}"
+            elif [[ -n "$line" ]]; then
+                echo "$line"
+            fi
+        fi
+    done < "$temp_file"
+
+    # If git add was silent (successful), show visual feedback
+    if [[ ! -s "$temp_file" && $exit_code -eq 0 && $# -gt 0 ]]; then
+        echo -e "${GREEN}📦 Staged files successfully${NC}"
+    fi
+
+    rm -f "$temp_file"
+    return $exit_code
+}
+
+function main() {
+    # Check if we're in a git repository
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        echo -e "${RED}fatal: not a git repository (or any of the parent directories): .git${NC}"
+        exit 128
+    fi
+
+    execute_add "$@"
+}
+
+main "$@"
